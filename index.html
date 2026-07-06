@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>GiftHub - Space Marketplace</title>
+    <!-- Подключаем Telegram Web Apps API -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-space: #070709;
+            --bg-card: #111114;
+            --bg-input: #16161c;
+            --text-main: #ffffff;
+            --text-muted: #6c6c73;
+            --accent-white: #ffffff;
+            --overlay-bg: rgba(0, 0, 0, 0.6);
+            --tg-theme-bg-color: #070709; /* Фолбэк */
+        }
+
+        body.light-theme {
+            --bg-space: #f4f4f7;
+            --bg-card: #ffffff;
+            --bg-input: #ededf2;
+            --text-main: #0f0f12;
+            --text-muted: #7c7c85;
+            --accent-white: #0f0f12;
+            --overlay-bg: rgba(0, 0, 0, 0.3);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: '-apple-system', BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg-space);
+            color: var(--text-main);
+            overflow-x: hidden;
+            padding-bottom: 110px;
+            transition: background-color 0.2s, color 0.2s;
+        }
+
+        header {
+            padding: 20px 16px 8px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+        }
+
+        .balance {
+            background: var(--bg-card);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        .container {
+            padding: 0 16px 16px 16px;
+        }
+
+        .page {
+            display: none;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        /* Поиск */
+        .search-container {
+            margin-bottom: 20px;
+            position: sticky;
+            top: 0;
+            background: var(--bg-space);
+            padding: 10px 0;
+            z-index: 9;
+        }
+
+        .search-combo-box {
+            display: flex;
+            align-items: center;
+            background: var(--bg-input);
+            border-radius: 14px;
+            padding: 0 14px;
+            height: 48px;
+        }
+
+        .search-combo-box i {
+            color: var(--text-muted);
+            font-size: 15px;
+            margin-right: 10px;
+        }
+
+        .search-input {
+            flex: 1;
+            background: none;
+            border: none;
+            color: var(--text-main);
+            font-size: 15px;
+            outline: none;
+        }
+
+        .btn-filter-inline {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 16px;
+            cursor: pointer;
+            padding: 10px;
+        }
+
+        /* Шторки / Bottom Sheets */
+        .filter-overlay, .modal-overlay, .info-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--overlay-bg);
+            z-index: 99;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .filter-overlay.active, .modal-overlay.active, .info-overlay.active {
+            opacity: 1;
+            visibility: visible;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+
+        .filter-sheet, .info-sheet {
+            position: fixed;
+            bottom: 0; left: 0; width: 100%;
+            background: var(--bg-card);
+            border-radius: 24px 24px 0 0;
+            padding: 24px 20px;
+            z-index: 100;
+            transform: translateY(100%);
+            transition: transform 0.3s ease-out;
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+
+        .filter-sheet.active, .info-sheet.active {
+            transform: translateY(0);
+        }
+
+        .sheet-handle {
+            width: 36px; height: 4px;
+            background: rgba(120, 120, 120, 0.2);
+            border-radius: 2px;
+            position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+        }
+
+        .sheet-header {
+            display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;
+        }
+
+        .btn-close-sheet { background: none; border: none; color: var(--text-muted); font-size: 20px; }
+        .filter-group { margin-bottom: 18px; }
+        .filter-label { font-size: 13px; color: var(--text-muted); margin-bottom: 8px; font-weight: 500; display: block; }
+        
+        .price-inputs { display: flex; gap: 8px; }
+        .price-inputs input {
+            width: 50%; background: var(--bg-input); border: none; border-radius: 10px; padding: 12px; color: var(--text-main); font-size: 14px; outline: none; text-align: center;
+        }
+
+        .select-wrapper { position: relative; }
+        select {
+            width: 100%; background: var(--bg-input); border: none; border-radius: 10px; padding: 14px; color: var(--text-main); font-size: 14px; outline: none; -webkit-appearance: none;
+        }
+        select:disabled { opacity: 0.3; }
+        .select-wrapper::after {
+            content: '\f107'; font-family: 'Font Awesome 5 Free'; font-weight: 900;
+            position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+            color: var(--text-muted); pointer-events: none;
+        }
+
+        .btn-apply {
+            width: 100%; background: var(--accent-white); color: var(--bg-space); border: none; padding: 15px; border-radius: 12px; font-size: 15px; font-weight: 700; margin-top: 10px;
+        }
+
+        /* Карточки Маркета */
+        .gift-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .gift-card { background: var(--bg-card); border-radius: 16px; padding: 12px; display: flex; flex-direction: column; position: relative; cursor: pointer; }
+        
+        .card-author { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; font-size: 11px; color: var(--text-muted); }
+        .card-author .mini-avatar { width: 18px; height: 18px; border-radius: 50%; background: var(--bg-input); display: flex; align-items: center; justify-content: center; font-size: 9px; overflow: hidden; }
+        .card-author .mini-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+        /* Поддержка анимированных подарков (img/video/emoji) */
+        .gift-img { width: 100%; aspect-ratio: 1; background: var(--bg-input); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 44px; margin-bottom: 12px; overflow: hidden; }
+        .gift-img img, .gift-img video { width: 80%; height: 80%; object-fit: contain; }
+
+        .gift-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+        .gift-price { font-size: 14px; font-weight: 700; margin-top: auto; display: flex; justify-content: space-between; align-items: center; }
+        .gift-price span.stock-tag { font-size: 11px; color: var(--text-muted); font-weight: normal; }
+
+        /* Детали */
+        .detail-header { display: flex; align-items: center; gap: 12px; margin: 10px 0 20px 0; }
+        .btn-back { background: none; border: none; color: var(--text-main); font-size: 20px; }
+        .big-gift-img { width: 100%; height: 180px; background: var(--bg-input); border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 84px; margin-bottom: 20px; overflow: hidden; }
+        .big-gift-img img, .big-gift-img video { width: 60%; height: 60%; object-fit: contain; }
+
+        /* График */
+        .chart-container { background: var(--bg-card); border-radius: 16px; padding: 16px; margin-bottom: 20px; }
+        .chart-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+        .chart-title { font-size: 13px; color: var(--text-muted); }
+        .time-filters { display: flex; background: var(--bg-input); border-radius: 8px; padding: 2px; }
+        .time-btn { background: none; border: none; color: var(--text-muted); padding: 4px 10px; font-size: 11px; font-weight: 600; border-radius: 6px; }
+        .time-btn.active { background: rgba(120, 120, 120, 0.2); color: var(--text-main); }
+        .svg-chart-wrapper { position: relative; width: 100%; height: 140px; margin-top: 10px; touch-action: none; }
+        .svg-chart-wrapper svg { width: 100%; height: 100%; overflow: visible; }
+        .chart-marker-line { stroke: rgba(120, 120, 120, 0.3); stroke-width: 1px; display: none; }
+        .chart-marker-dot { fill: var(--text-main); stroke: var(--bg-card); stroke-width: 2px; display: none; }
+        .live-price-display { margin-top: 16px; text-align: center; font-size: 16px; font-weight: 700; min-height: 22px; }
+        .live-price-display span { font-size: 12px; color: var(--text-muted); font-weight: normal; margin-left: 6px; }
+
+        .history-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;}
+        .history-item { display: flex; justify-content: space-between; align-items: center; background: var(--bg-card); padding: 12px; border-radius: 12px; font-size: 13px; }
+        .user-info { display: flex; align-items: center; gap: 10px; }
+        .avatar { width: 30px; height: 30px; background: var(--bg-input); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 11px; }
+        .time { color: var(--text-muted); font-size: 11px; }
+        .btn-buy { width: 100%; background: var(--accent-white); color: var(--bg-space); border: none; padding: 16px; border-radius: 14px; font-size: 16px; font-weight: 700; }
+
+        /* Профиль */
+        .profile-card { background: var(--bg-card); border-radius: 20px; padding: 20px; display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
+        .profile-avatar { width: 64px; height: 64px; border-radius: 50%; background-color: var(--bg-input); background-size: cover; background-position: center; }
+        .profile-info h3 { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+        .profile-info p { font-size: 13px; color: var(--text-muted); }
+        .profile-section-title { font-size: 15px; font-weight: 700; margin-bottom: 12px; margin-top: 10px; }
+        .empty-warehouse { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 20px; color: var(--text-muted); font-size: 14px; text-align: center; gap: 8px; }
+        .empty-warehouse i { font-size: 26px; opacity: 0.4; }
+
+        /* Стильное Окно Информации о подарке */
+        .info-gift-meta { display: flex; flex-direction: column; gap: 14px; margin-top: 16px; }
+        .meta-row { display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid rgba(120, 120, 120, 0.1); font-size: 14px; }
+        .meta-row span:first-child { color: var(--text-muted); font-weight: 500; }
+        .meta-row span:last-child { font-weight: 600; color: var(--text-main); }
+
+        /* НОВЫЙ КРАСИВЫЙ ДИЗАЙН НАСТРОЕК */
+        .settings-list { display: flex; flex-direction: column; gap: 14px; }
+        .settings-card {
+            background: var(--bg-card); border-radius: 18px; padding: 16px;
+            display: flex; flex-direction: column; gap: 16px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .settings-row {
+            display: flex; justify-content: space-between; align-items: center;
+            position: relative;
+        }
+        .settings-label-side { display: flex; align-items: center; gap: 14px; }
+        .settings-icon-wrapper {
+            width: 38px; height: 38px; border-radius: 12px; background: var(--bg-input);
+            display: flex; align-items: center; justify-content: center; color: var(--text-main); font-size: 16px;
+        }
+        .settings-text-block { display: flex; flex-direction: column; }
+        .settings-text-block .main-title { font-size: 15px; font-weight: 600; }
+        .settings-text-block .sub-desc { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+        
+        /* Кастомный минималистичный селектор внутри строки настроек */
+        .settings-select-pill {
+            background: var(--bg-input); color: var(--text-main); border: none;
+            padding: 8px 32px 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 600;
+            outline: none; -webkit-appearance: none; cursor: pointer;
+        }
+        .select-pill-wrapper { position: relative; }
+        .select-pill-wrapper::after {
+            content: '\f107'; font-family: 'Font Awesome 5 Free'; font-weight: 900;
+            position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+            color: var(--text-muted); pointer-events: none; font-size: 12px;
+        }
+
+        .btn-reset { width: 100%; background: rgba(255, 59, 48, 0.1); color: #ff453a; border: none; padding: 16px; border-radius: 16px; font-size: 14px; font-weight: 700; margin-top: 20px; transition: background 0.2s; }
+        .btn-reset:active { background: rgba(255, 59, 48, 0.2); }
+
+        /* Модалка Подтверждения */
+        .confirm-modal {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.9);
+            background: var(--bg-card); width: 85%; max-width: 340px; border-radius: 20px;
+            padding: 24px; z-index: 100; opacity: 0; visibility: hidden;
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); text-align: center;
+        }
+        .confirm-modal.active { opacity: 1; visibility: visible; transform: translate(-50%, -50%) scale(1); }
+        .modal-title { font-size: 17px; font-weight: 700; margin-bottom: 10px; }
+        .modal-desc { font-size: 14px; color: var(--text-muted); margin-bottom: 24px; line-height: 1.4; }
+        .modal-buttons { display: flex; gap: 12px; }
+        .btn-modal { flex: 1; padding: 12px; border-radius: 10px; font-size: 14px; font-weight: 700; border: none; }
+        .btn-modal-no { background: var(--bg-input); color: var(--text-main); }
+        .btn-modal-yes { background: var(--accent-white); color: var(--bg-space); }
+
+        /* Меню навигации */
+        nav {
+            position: fixed; bottom: 15px; left: 16px; right: 16px; height: 64px;
+            background: rgba(20, 20, 26, 0.45); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
+            border: none; border-radius: 32px; display: flex; justify-content: space-around; align-items: center; z-index: 90;
+        }
+        body.light-theme nav { background: rgba(255, 255, 255, 0.6); }
+        .nav-item { color: var(--text-muted); display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 10px; text-decoration: none; width: 22%; text-align: center; }
+        .nav-item i { font-size: 18px; }
+        .nav-item.active { color: var(--text-main); }
+        .nav-avatar { width: 20px; height: 20px; border-radius: 50%; background-color: var(--text-muted); background-size: cover; background-position: center; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo" id="header-logo">GiftHub</div>
+        <div class="balance" id="header-balance"><i class="fa-solid fa-wallet"></i> 0.00 TON</div>
+    </header>
+
+    <!-- Оверлеи -->
+    <div class="filter-overlay" id="filterOverlay" onclick="toggleFilters(false)"></div>
+    <div class="modal-overlay" id="modalOverlay"></div>
+    <div class="info-overlay" id="infoOverlay" onclick="toggleInfoSheet(false)"></div>
+
+    <!-- Полный набор фильтрации -->
+    <div class="filter-sheet" id="filterSheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-header">
+            <h3 id="txt-filter-title" style="font-weight: 700; font-size: 17px;">Фильтры</h3>
+            <button class="btn-close-sheet" onclick="toggleFilters(false)"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="filter-group">
+            <label class="filter-label" id="txt-lbl-price">Цена</label>
+            <div class="price-inputs"><input type="number" placeholder="от" id="filter-price-from"><input type="number" placeholder="до" id="filter-price-to"></div>
+        </div>
+        <div class="filter-group">
+            <label class="filter-label" id="txt-lbl-type">Тип подарка</label>
+            <div class="select-wrapper">
+                <select id="filter-type" onchange="checkGiftSelection()">
+                    <option value="" id="txt-opt-select">Выберите подарок...</option>
+                    <option value="pepe">Лягушонок Pepe 🐸</option>
+                    <option value="icecream">Мороженка 🍦</option>
+                    <option value="brick">Кирпич 🧱</option>
+                </select>
+            </div>
+        </div>
+        <div class="filter-group">
+            <label class="filter-label" id="txt-lbl-bg">Задний фон</label>
+            <div class="select-wrapper"><select id="filter-bg" disabled><option value="all" id="txt-opt-bg">Любой фон</option></select></div>
+        </div>
+        <div class="filter-group">
+            <label class="filter-label" id="txt-lbl-pattern">Узор</label>
+            <div class="select-wrapper"><select id="filter-pattern" disabled><option value="all" id="txt-opt-pattern">Любой узор</option></select></div>
+        </div>
+        <div class="filter-group">
+            <label class="filter-label" id="txt-lbl-model">Модель</label>
+            <div class="select-wrapper"><select id="filter-model" disabled><option value="all" id="txt-opt-model">Все модели</option></select></div>
+        </div>
+        <button class="btn-apply" id="txt-btn-apply" onclick="toggleFilters(false)">Применить</button>
+    </div>
+
+    <!-- Модалка подтверждения -->
+    <div class="confirm-modal" id="confirmModal">
+        <div class="modal-title" id="txt-mdl-title">Подтверждение покупки</div>
+        <div class="modal-desc" id="txt-mdl-desc">Вы уверены? Средства будут списаны с вашего кошелька.</div>
+        <div class="modal-buttons">
+            <button class="btn-modal btn-modal-no" id="txt-mdl-no" onclick="closeConfirmModal(false)">Нет</button>
+            <button class="btn-modal btn-modal-yes" id="txt-mdl-yes" onclick="closeConfirmModal(true)">Да</button>
+        </div>
+    </div>
+
+    <!-- Шторка информации о подарке из профиля -->
+    <div class="info-sheet" id="infoSheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-header">
+            <h3 id="info-sheet-title" style="font-weight: 700; font-size: 18px;">Детали подарка</h3>
+            <button class="btn-close-sheet" onclick="toggleInfoSheet(false)"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="big-gift-img" id="info-sheet-icon" style="height: 140px; font-size: 64px;">🎁</div>
+        <div class="info-gift-meta">
+            <div class="meta-row"><span id="txt-meta-from">От кого:</span><span id="info-meta-from">-</span></div>
+            <div class="meta-row"><span id="txt-meta-date">Дата получения:</span><span id="info-meta-date">-</span></div>
+            <div class="meta-row"><span id="txt-meta-dur">Стойкость:</span><span id="info-meta-dur">-</span></div>
+            <div class="meta-row"><span>ID:</span><span id="info-meta-id">-</span></div>
+        </div>
+    </div>
+
+    <div class="container">
+
+        <!-- РЫНОК -->
+        <div id="market" class="page active">
+            <div class="search-container">
+                <div class="search-combo-box">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" class="search-input" placeholder="Поиск по названию..." id="searchBar" oninput="liveSearch()">
+                    <button class="btn-filter-inline" onclick="toggleFilters(true)"><i class="fa-solid fa-sliders"></i></button>
+                </div>
+            </div>
+            <div class="gift-grid" id="market-grid">
+                <!-- Заполняется динамически из Telegram API бота -->
+            </div>
+        </div>
+
+        <!-- ДЕТАЛИ -->
+        <div id="details" class="page">
+            <div class="detail-header">
+                <button class="btn-back" onclick="navigate('market')"><i class="fa-solid fa-arrow-left"></i></button>
+                <h2 id="detail-title" style="font-weight: 700;">Подарок</h2>
+            </div>
+            <div class="big-gift-img" id="detail-icon">🪐</div>
+            
+            <div class="chart-container">
+                <div class="chart-header-row">
+                    <span class="chart-title" id="txt-chart-title">Динамика цен</span>
+                    <div class="time-filters">
+                        <button class="time-btn" id="btn-day" onclick="setPeriod('day')">День</button>
+                        <button class="time-btn active" id="btn-week" onclick="setPeriod('week')">Неделя</button>
+                        <button class="time-btn" id="btn-month" onclick="setPeriod('month')">Месяц</button>
+                    </div>
+                </div>
+                <div class="svg-chart-wrapper" id="chartWrapper">
+                    <svg id="priceSvg">
+                        <defs><mask id="chartMask"><rect id="maskRect" x="0" y="0" width="100%" height="100%" fill="white" /></mask></defs>
+                        <line x1="0" y1="20" x2="100%" y2="20" stroke="rgba(120,120,120,0.06)" /><line x1="0" y1="70" x2="100%" y2="70" stroke="rgba(120,120,120,0.06)" /><line x1="0" y1="120" x2="100%" y2="120" stroke="rgba(120,120,120,0.06)" />
+                        <path id="greyPath" d="" fill="none" stroke="rgba(120, 120, 120, 0.25)" stroke-width="2.5"/><path id="whitePath" d="" fill="none" stroke="var(--text-main)" stroke-width="2.5" mask="url(#chartMask)"/>
+                        <line id="markerLine" class="chart-marker-line" x1="0" y1="0" x2="0" y2="140" /><circle id="markerDot" class="chart-marker-dot" r="5" />
+                    </svg>
+                </div>
+                <div class="live-price-display" id="livePriceDisplay"><span id="livePriceVal">0.00 TON</span><span id="liveTimeVal">Сейчас</span></div>
+            </div>
+            <h3 id="txt-deals-title" style="margin-bottom: 12px; font-size: 15px;">Последние сделки</h3>
+            <div class="history-list" id="detail-history"></div>
+            <button class="btn-buy" id="txt-btn-buy" onclick="askBuyConfirmation()">Купить Лот</button>
+        </div>
+
+        <!-- ПРОФИЛЬ -->
+        <div id="profile" class="page">
+            <div class="profile-card">
+                <div class="profile-avatar" id="user-avatar"></div>
+                <div class="profile-info">
+                    <h3 id="prof-nick">@TelegramUser</h3>
+                    <p id="prof-id">ID: 000000000</p>
+                </div>
+            </div>
+            <div class="profile-section-title" id="txt-my-gifts">Мои Подарки</div>
+            <div class="gift-grid" id="my-gifts-container"></div>
+            <div class="empty-warehouse" id="emptyWarehousePlaceholder"><i class="fa-solid fa-box-open"></i><div id="txt-empty-wh">Здесь пусто</div></div>
+        </div>
+
+        <!-- НАСТРОЙКИ (КРАСИВЫЙ БЛОЧНЫЙ ДИЗАЙН КАРТОЧКАМИ) -->
+        <div id="settings" class="page">
+            <h2 id="txt-settings-main" style="margin-top: 20px; margin-bottom: 20px; font-weight: 700;">Настройки</h2>
+            
+            <div class="settings-list">
+                <div class="settings-card">
+                    <div class="settings-row">
+                        <div class="settings-label-side">
+                            <div class="settings-icon-wrapper"><i class="fa-solid fa-language"></i></div>
+                            <div class="settings-text-block">
+                                <span class="main-title" id="txt-set-lang">Язык</span>
+                                <span class="sub-desc">Choose app language</span>
+                            </div>
+                        </div>
+                        <div class="select-pill-wrapper">
+                            <select class="settings-select-pill" id="setting-lang" onchange="changeLang()">
+                                <option value="ru">Русский</option>
+                                <option value="en">English</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-card">
+                    <div class="settings-row">
+                        <div class="settings-label-side">
+                            <div class="settings-icon-wrapper"><i class="fa-solid fa-palette"></i></div>
+                            <div class="settings-text-block">
+                                <span class="main-title" id="txt-set-theme">Тема оформления</span>
+                                <span class="sub-desc">Visual color style</span>
+                            </div>
+                        </div>
+                        <div class="select-pill-wrapper">
+                            <select class="settings-select-pill" id="setting-theme" onchange="toggleTheme()">
+                                <option value="dark">Космическая</option>
+                                <option value="light">Светлая</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-card">
+                    <div class="settings-row">
+                        <div class="settings-label-side">
+                            <div class="settings-icon-wrapper"><i class="fa-solid fa-coins"></i></div>
+                            <div class="settings-text-block">
+                                <span class="main-title" id="txt-set-curr">Основная валюта</span>
+                                <span class="sub-desc">Display currency values</span>
+                            </div>
+                        </div>
+                        <div class="select-pill-wrapper">
+                            <select class="settings-select-pill" id="setting-currency" onchange="changeCurrency()">
+                                <option value="TON">TON</option>
+                                <option value="STARS">Stars ⭐️</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn-reset" id="txt-btn-reset" onclick="resetAllData()">Сбросить данные приложения</button>
+        </div>
+
+    </div>
+
+    <nav>
+        <a href="#" class="nav-item active" id="tab-market" onclick="navigate('market')"><i class="fa-solid fa-rocket"></i><span id="lbl-nav-mkt">Рынок</span></a>
+        <a href="#" class="nav-item" id="tab-profile" onclick="navigate('profile')"><div class="nav-avatar" id="nav-avatar-img"></div><span id="lbl-nav-prof">Профиль</span></a>
+        <a href="#" class="nav-item" id="tab-settings" onclick="navigate('settings')"><i class="fa-solid fa-gear"></i><span id="lbl-nav-set">Настройки</span></a>
+    </nav>
+
+    <script>
+        const tg = window.Telegram?.WebApp;
+        if(tg) { tg.ready(); tg.expand(); }
+
+        let currentPeriod = 'week', chartData = [], basePrice = 1.50, currentCurrency = 'TON', cachedPoints = [], currentLang = 'ru';
+        
+        // Мокап структуры, которая теперь может динамически наполняться через fetch() вашего бота
+        let remoteMarketItems = [
+            { id: 101, name: "Лягушонок Pepe", emoji: "🐸", assetUrl: "", price: 1.50, stock: "1/10", seller: "@crypto_king", sellerAvatar: "👑", duration: "98%", from: "@pepe_drop", date: "12.05.2026" },
+            { id: 102, name: "Мороженка", emoji: "🍦", assetUrl: "", price: 0.30, stock: "12/100", seller: "@whale_ton", sellerAvatar: "🐳", duration: "100%", from: "@ton_community", date: "01.06.2026" },
+            { id: 103, name: "Кирпич", emoji: "🧱", assetUrl: "", price: 5.00, stock: "1/5", seller: "@ton_dev", sellerAvatar: "🛠️", duration: "84%", from: "@ Durov", date: "24.04.2026" }
+        ];
+
+        const languages = {
+            ru: {
+                market: "Рынок", profile: "Профиль", settings: "Настройки", filterTitle: "Фильтры", price: "Цена", type: "Тип подарка",
+                selectGift: "Выберите подарок...", bg: "Задний фон", pattern: "Узор", model: "Модель", anyBg: "Любой фон",
+                anyPattern: "Любой узор", allModels: "Все модели", apply: "Применить", searchPlace: "Поиск по названию...",
+                chartTitle: "Динамика цен", lastDeals: "Последние сделки", buyLot: "Купить Лот", myGifts: "Мои Подарки",
+                emptyWh: "Здесь пусто", myLots: "Мои Лот-объявления", emptyLots: "Активных лотов нет", setLang: "Язык",
+                setTheme: "Тема оформления", setCurr: "Основная валюта", resetBtn: "Сбросить данные",
+                mdlTitle: "Подтверждение покупки", mdlDesc: "Вы уверены? Средства будут списаны с вашего кошелька.",
+                yes: "Да", no: "Нет", day: "День", week: "Неделя", month: "Месяц", soldBy: "Продано", justNow: "Только что",
+                confirmReset: "Вы уверены?", successBuy: "Успешно куплено!", detailsTitle: "Детали подарка",
+                mFrom: "От кого:", mDate: "Дата получения:", mDur: "Стойкость:"
+            },
+            en: {
+                market: "Market", profile: "Profile", settings: "Settings", filterTitle: "Filters", price: "Price", type: "Gift Type",
+                selectGift: "Select a gift...", bg: "Background", pattern: "Pattern", model: "Model", anyBg: "Any background",
+                anyPattern: "Any pattern", allModels: "All models", apply: "Apply", searchPlace: "Search by title...",
+                chartTitle: "Price Dynamics", lastDeals: "Recent Deals", buyLot: "Buy Lot", myGifts: "My Gifts",
+                emptyWh: "It's empty here", myLots: "My Lot Listings", emptyLots: "No active lots", setLang: "Language",
+                setTheme: "Theme", setCurr: "Currency", resetBtn: "Reset Data",
+                mdlTitle: "Confirm Purchase", mdlDesc: "Are you sure? Funds will be debited.",
+                yes: "Yes", no: "No", day: "Day", week: "Week", month: "Month", soldBy: "Sold by", justNow: "Just now",
+                confirmReset: "Are you sure?", successBuy: "Successfully purchased!", detailsTitle: "Gift Details",
+                mFrom: "From:", mDate: "Received:", mDur: "Durability:"
+            }
+        };
+
+        // Интеграция с данными Телеграма
+        function initTelegramUser() {
+            if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
+                const user = tg.initDataUnsafe.user;
+                document.getElementById('prof-nick').innerText = user.username ? `@${user.username}` : `${user.first_name}`;
+                document.getElementById('prof-id').innerText = `ID: ${user.id}`;
+                if (user.photo_url) {
+                    document.getElementById('user-avatar').style.backgroundImage = `url('${user.photo_url}')`;
+                    document.getElementById('nav-avatar-img').style.backgroundImage = `url('${user.photo_url}')`;
+                }
+            }
+            fetchTelegramMarketData();
+        }
+
+        // Эмуляция/подготовка запроса к Боту для получения подарков (включая ссылки на анимации)
+        async function fetchTelegramMarketData() {
+            // Здесь в будущем будет: fetch('https://your-bot-server.com/api/getGifts')
+            renderMarketGrid(remoteMarketItems);
+        }
+
+        function renderMarketGrid(items) {
+            const grid = document.getElementById('market-grid');
+            grid.innerHTML = '';
+            items.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'gift-card';
+                card.onclick = () => openGift(item.name, item.emoji, item.price, item.stock, item.seller, item.assetUrl);
+                
+                // Рендерим иконку или анимированную сущность из ТГ
+                let mediaContent = item.emoji;
+                if(item.assetUrl.endsWith('.mp4')) {
+                    mediaContent = `<video src="${item.assetUrl}" autoplay loop muted playsinline></video>`;
+                } else if(item.assetUrl) {
+                    mediaContent = `<img src="${item.assetUrl}" alt="" />`;
+                }
+
+                card.innerHTML = `
+                    <div class="card-author"><div class="mini-avatar">${item.sellerAvatar}</div>${item.seller}</div>
+                    <div class="gift-img">${mediaContent}</div>
+                    <div class="gift-title">${item.name}</div>
+                    <div class="gift-price"><span class="price-val">${item.price.toFixed(2)} TON</span> <span class="stock-tag">${item.stock}</span></div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function translateUI() {
+            const l = languages[currentLang];
+            document.getElementById('lbl-nav-mkt').innerText = l.market;
+            document.getElementById('lbl-nav-prof').innerText = l.profile;
+            document.getElementById('lbl-nav-set').innerText = l.settings;
+            document.getElementById('txt-filter-title').innerText = l.filterTitle;
+            document.getElementById('txt-lbl-price').innerText = l.price;
+            document.getElementById('txt-lbl-type').innerText = l.type;
+            document.getElementById('txt-opt-select').innerText = l.selectGift;
+            document.getElementById('txt-lbl-bg').innerText = l.bg;
+            document.getElementById('txt-opt-bg').innerText = l.anyBg;
+            document.getElementById('txt-lbl-pattern').innerText = l.pattern;
+            document.getElementById('txt-opt-pattern').innerText = l.anyPattern;
+            document.getElementById('txt-lbl-model').innerText = l.model;
+            document.getElementById('txt-opt-model').innerText = l.allModels;
+            document.getElementById('txt-btn-apply').innerText = l.apply;
+            document.getElementById('searchBar').placeholder = l.searchPlace;
+            document.getElementById('txt-chart-title').innerText = l.chartTitle;
+            document.getElementById('txt-deals-title').innerText = l.lastDeals;
+            document.getElementById('txt-btn-buy').innerText = l.buyLot;
+            document.getElementById('txt-my-gifts').innerText = l.myGifts;
+            document.getElementById('txt-empty-wh').innerText = l.emptyWh;
+            document.getElementById('txt-settings-main').innerText = l.settings;
+            document.getElementById('txt-set-lang').innerText = l.setLang;
+            document.getElementById('txt-set-theme').innerText = l.setTheme;
+            document.getElementById('txt-set-curr').innerText = l.setCurr;
+            document.getElementById('txt-btn-reset').innerText = l.resetBtn;
+            document.getElementById('txt-mdl-title').innerText = l.mdlTitle;
+            document.getElementById('txt-mdl-desc').innerText = l.mdlDesc;
+            document.getElementById('txt-mdl-yes').innerText = l.yes;
+            document.getElementById('txt-mdl-no').innerText = l.no;
+            document.getElementById('btn-day').innerText = l.day;
+            document.getElementById('btn-week').innerText = l.week;
+            document.getElementById('btn-month').innerText = l.month;
+            document.getElementById('info-sheet-title').innerText = l.detailsTitle;
+            document.getElementById('txt-meta-from').innerText = l.mFrom;
+            document.getElementById('txt-meta-date').innerText = l.mDate;
+            document.getElementById('txt-meta-dur').innerText = l.mDur;
+        }
+
+        function openGift(name, icon, price, stock, seller, assetUrl) {
+            basePrice = price;
+            document.getElementById('detail-title').innerText = name;
+            
+            let media = icon;
+            if(assetUrl && assetUrl.endsWith('.mp4')) media = `<video src="${assetUrl}" autoplay loop muted playsinline></video>`;
+            else if(assetUrl) media = `<img src="${assetUrl}"/>`;
+            document.getElementById('detail-icon').innerHTML = media;
+            
+            document.getElementById('detail-history').innerHTML = `
+                <div class="history-item">
+                    <div class="user-info">
+                        <div class="avatar">${seller.substring(1,3).toUpperCase()}</div>
+                        <div>${languages[currentLang].soldBy} ${seller} (${stock})</div>
+                    </div>
+                    <div class="time">${languages[currentLang].justNow}</div>
+                </div>`;
+            
+            navigate('details');
+            setTimeout(() => setPeriod('week'), 40);
+        }
+
+        // Открытие инфо-карточки во вкладке Профиль
+        function openOwnedGiftInfo(name, icon, from, date, duration, id) {
+            document.getElementById('info-sheet-icon').innerHTML = icon;
+            document.getElementById('info-meta-from').innerText = from;
+            document.getElementById('info-meta-date').innerText = date;
+            document.getElementById('info-meta-dur').innerText = duration;
+            document.getElementById('info-meta-id').innerText = id;
+            toggleInfoSheet(true);
+        }
+
+        function toggleInfoSheet(show) {
+            document.getElementById('infoOverlay').className = show ? 'info-overlay active' : 'info-overlay';
+            document.getElementById('infoSheet').className = show ? 'info-sheet active' : 'info-sheet';
+        }
+
+        function askBuyConfirmation() {
+            document.getElementById('modalOverlay').classList.add('active');
+            document.getElementById('confirmModal').classList.add('active');
+        }
+
+        function closeConfirmModal(isConfirmed) {
+            document.getElementById('modalOverlay').classList.remove('active');
+            document.getElementById('confirmModal').classList.remove('active');
+            
+            if(isConfirmed) {
+                setTimeout(() => {
+                    const container = document.getElementById('my-gifts-container');
+                    const card = document.createElement('div');
+                    card.className = 'gift-card';
+                    
+                    let innerIcon = document.getElementById('detail-icon').innerHTML;
+                    let uniqueId = Math.floor(100000 + Math.random() * 900000);
+                    let giftName = document.getElementById('detail-title').innerText;
+                    
+                    // Передаем параметры для открытия инфо-окна
+                    card.onclick = (e) => {
+                        e.stopPropagation();
+                        openOwnedGiftInfo(giftName, innerIcon, "@GiftHubBot", "Сегодня", "100%", "#" + uniqueId);
+                    };
+
+                    card.innerHTML = `<div class="gift-img">${innerIcon}</div><div class="gift-title">${giftName}</div><div class="gift-price"><span class="price-val">${basePrice.toFixed(2)} TON</span></div>`;
+                    container.appendChild(card);
+                    navigate('profile');
+                }, 300);
+            }
+        }
+
+        // Остальной вспомогательный UI-функционал графика и фильтров
+        function generateData(period) {
+            chartData = [];
+            let steps = period === 'day' ? 24 : (period === 'week' ? 7 : 30);
+            for(let i = 0; i < steps; i++) {
+                let label = period === 'day' ? `${String(i).padStart(2, '0')}:00` : (period === 'week' ? (currentLang==='ru'?['Вс','Пн','Вт','Ср','Чт','Пт','Сб']:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'])[i%7] : `${i+1} d`);
+                chartData.push({ label, price: basePrice * (0.9 + Math.random() * 0.25) });
+            }
+            chartData[chartData.length - 1].price = basePrice;
+        }
+
+        function drawChart() {
+            const wrapper = document.getElementById('chartWrapper');
+            const width = wrapper.clientWidth;
+            if(chartData.length === 0 || width === 0) return;
+            const prices = chartData.map(d => d.price);
+            const minP = Math.min(...prices), maxP = Math.max(...prices), range = maxP - minP || 1;
+            cachedPoints = chartData.map((d, i) => ({ x: (i / (chartData.length - 1)) * width, y: 130 - ((d.price - minP) / range) * 100, data: d }));
+            let d = `M ${cachedPoints[0].x} ${cachedPoints[0].y}`;
+            for (let i = 0; i < cachedPoints.length - 1; i++) {
+                let cpX = cachedPoints[i].x + (cachedPoints[i+1].x - cachedPoints[i].x) / 2;
+                d += ` C ${cpX} ${cachedPoints[i].y}, ${cpX} ${cachedPoints[i+1].y}, ${cachedPoints[i+1].x} ${cachedPoints[i+1].y}`;
+            }
+            document.getElementById('greyPath').setAttribute('d', d);
+            document.getElementById('whitePath').setAttribute('d', d);
+            setMaskProgress(1.0);
+        }
+
+        function setMaskProgress(progress) {
+            const wrapper = document.getElementById('chartWrapper'), width = wrapper.clientWidth;
+            const maskRect = document.getElementById('maskRect'), markerLine = document.getElementById('markerLine'), markerDot = document.getElementById('markerDot');
+            if (progress >= 1.0) {
+                maskRect.setAttribute('width', '100%');
+                markerLine.style.display = 'none'; markerDot.style.display = 'none';
+                updatePriceDisplay(basePrice, currentPeriod === 'day' ? '24:00' : (currentLang === 'ru' ? 'Сегодня' : 'Today'));
+            } else {
+                let targetX = width * progress;
+                maskRect.setAttribute('width', targetX);
+                markerLine.setAttribute('x1', targetX); markerLine.setAttribute('x2', targetX); markerLine.style.display = 'block';
+                let idx = Math.max(0, Math.min(cachedPoints.length - 1, Math.round(progress * (cachedPoints.length - 1))));
+                let pt = cachedPoints[idx];
+                if(pt) {
+                    markerDot.setAttribute('cx', pt.x); markerDot.setAttribute('cy', pt.y); markerDot.style.display = 'block';
+                    updatePriceDisplay(pt.data.price, pt.data.label);
+                }
+            }
+        }
+
+        function updatePriceDisplay(price, label) {
+            let symbol = currentCurrency === 'TON' ? 'TON' : '⭐️';
+            document.getElementById('livePriceVal').innerText = `${price.toFixed(2)} ${symbol}`;
+            document.getElementById('liveTimeVal').innerText = label;
+        }
+
+        function initTouchEvents() {
+            const wrapper = document.getElementById('chartWrapper');
+            const handle = (e) => {
+                const rect = wrapper.getBoundingClientRect();
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                setMaskProgress(Math.max(0, Math.min(1, (clientX - rect.left) / rect.width)));
+            };
+            wrapper.addEventListener('mousemove', handle);
+            wrapper.addEventListener('touchmove', handle, {passive: true});
+            wrapper.addEventListener('mouseleave', () => setMaskProgress(1.0));
+            wrapper.addEventListener('touchend', () => setMaskProgress(1.0));
+        }
+
+        function setPeriod(period) {
+            currentPeriod = period;
+            document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(`btn-${period}`).classList.add('active');
+            generateData(period); drawChart();
+        }
+
+        function navigate(pageId) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById(pageId).classList.add('active');
+            document.querySelectorAll('.nav-item').forEach(t => t.classList.remove('active'));
+            if(pageId === 'market' || pageId === 'details') document.getElementById('tab-market').classList.add('active');
+            if(pageId === 'profile') document.getElementById('tab-profile').classList.add('active');
+            if(pageId === 'settings') document.getElementById('tab-settings').classList.add('active');
+            if(pageId === 'profile') checkWarehouseStatus();
+        }
+
+        function toggleTheme() {
+            document.body.className = document.getElementById('setting-theme').value === 'light' ? 'light-theme' : '';
+        }
+
+        function changeCurrency() {
+            currentCurrency = document.getElementById('setting-currency').value;
+            fetchTelegramMarketData();
+        }
+
+        function changeLang() {
+            currentLang = document.getElementById('setting-lang').value;
+            translateUI();
+        }
+
+        function checkGiftSelection() {
+            const giftType = document.getElementById('filter-type').value;
+            ['filter-bg', 'filter-pattern', 'filter-model'].forEach(id => {
+                document.getElementById(id).disabled = (giftType === "");
+            });
+        }
+
+        function resetAllData() {
+            if(confirm(languages[currentLang].confirmReset)) {
+                document.getElementById('my-gifts-container').innerHTML = '';
+                checkWarehouseStatus(); navigate('market');
+            }
+        }
+
+        function checkWarehouseStatus() {
+            const c = document.getElementById('my-gifts-container');
+            document.getElementById('emptyWarehousePlaceholder').style.display = c.children.length === 0 ? 'flex' : 'none';
+        }
+
+        function toggleFilters(show) {
+            document.getElementById('filterOverlay').className = show ? 'filter-overlay active' : 'filter-overlay';
+            document.getElementById('filterSheet').className = show ? 'filter-sheet active' : 'filter-sheet';
+        }
+
+        function liveSearch() {
+            let q = document.getElementById('searchBar').value.toLowerCase();
+            document.querySelectorAll('#market-grid .gift-card').forEach(c => {
+                c.style.display = c.querySelector('.gift-title').innerText.toLowerCase().includes(q) ? 'flex' : 'none';
+            });
+        }
+
+        window.addEventListener('resize', drawChart);
+        window.onload = () => { initTouchEvents(); initTelegramUser(); checkWarehouseStatus(); translateUI(); };
+    </script>
+</body>
+</html>
