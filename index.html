@@ -918,15 +918,13 @@
     function isNameTaken(name) {
         if (!name || name.trim() === '') return false;
         const trimmed = name.trim();
-        // Игнорируем себя
-        if (trimmed === currentUserName) return false;
+        if (trimmed.toLowerCase() === currentUserName.toLowerCase()) return false;
         return userResults.some(u => u.name.toLowerCase() === trimmed.toLowerCase());
     }
 
     function addUserResult(name, type) {
         if (!name || name.trim() === '') name = 'Аноним';
         const trimmed = name.trim();
-        // Удаляем старые записи с этим именем
         userResults = userResults.filter(u => u.name.toLowerCase() !== trimmed.toLowerCase());
         userResults.unshift({ name: trimmed, type, time: Date.now() });
         if (userResults.length > 200) userResults = userResults.slice(0, 200);
@@ -1005,18 +1003,7 @@
 
     function initDefaultUsers() {
         loadResults();
-        if (userResults.length === 0) {
-            userResults = [
-                { name: 'Серёга', type: 'Бровистый', time: Date.now() - 100000 },
-                { name: 'Прыщ', type: 'Прыщ', time: Date.now() - 200000 },
-                { name: 'Гусеница', type: 'Гусеница', time: Date.now() - 300000 },
-                { name: 'Матрас', type: 'Матрас', time: Date.now() - 400000 },
-                { name: 'Аноним', type: 'Прыщ', time: Date.now() - 500000 },
-                { name: 'Лох', type: 'Матрас', time: Date.now() - 600000 },
-                { name: 'Краш', type: 'Бровистый', time: Date.now() - 700000 }
-            ];
-            saveResults();
-        }
+        // Пустой список — только настоящие игроки
     }
 
     const startPage = document.getElementById('startPage');
@@ -1263,22 +1250,20 @@
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    // Загрузка сохранённого имени
     function initSavedName() {
         const saved = loadSavedName();
         if (saved) {
             currentUserName = saved;
             userNameInput.value = saved;
-            savedNameInfo.innerHTML = `Ты уже проходил тест как <span>${saved}</span>`;
-            // Проверяем, есть ли результат у этого имени
             const existing = userResults.find(u => u.name.toLowerCase() === saved.toLowerCase());
             if (existing) {
                 savedNameInfo.innerHTML = `Ты уже проходил тест как <span>${saved}</span> (результат: <strong>${existing.type}</strong>)`;
+            } else {
+                savedNameInfo.innerHTML = `Ты уже проходил тест как <span>${saved}</span>`;
             }
         }
     }
 
-    // Проверка имени при вводе
     userNameInput.addEventListener('input', function() {
         const val = this.value.trim();
         errorMsg.classList.remove('show');
